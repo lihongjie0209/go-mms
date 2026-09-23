@@ -41,21 +41,22 @@ const maxAccessResults = 65536
 // DataValue is the internal representation of an MMS Data element.
 // Each field is populated based on the Tag value.
 type DataValue struct {
-	Tag         byte
-	Bool        bool
-	Int         int64
-	Uint        uint64
-	Float       float64
-	FloatWide   bool         // true = float64 (9 bytes), false = float32 (5 bytes)
-	Bytes       []byte       // OctetString, BitString data
-	BitLen      int          // BitString: number of valid bits
-	Str         string       // VisibleString, MmsString
-	Time        time.Time    // UTCTime
-	TimeQuality uint8        // UTCTime quality byte (IEC 61850-8-1 TimeQuality)
-	BinTimeMs   int64        // BinaryTime: ms since Unix epoch (6-byte) or ms since midnight (4-byte)
-	OID         []int        // ObjectIdentifier arcs
-	Elements    []*DataValue // Array, Structure children
-	ErrCode     int          // DataAccessError code
+	Tag          byte
+	Bool         bool
+	Int          int64
+	Uint         uint64
+	Float        float64
+	FloatWide    bool         // true = float64 (9 bytes), false = float32 (5 bytes)
+	Bytes        []byte       // OctetString, BitString data
+	BitLen       int          // BitString: number of valid bits
+	Str          string       // VisibleString, MmsString
+	Time         time.Time    // UTCTime
+	TimeQuality  uint8        // UTCTime quality byte (IEC 61850-8-1 TimeQuality)
+	BinTimeMs    int64        // BinaryTime: ms since Unix epoch (6-byte) or ms since midnight (4-byte)
+	BinTimeShort bool         // BinaryTime: true for the 4-byte time-only form
+	OID          []int        // ObjectIdentifier arcs
+	Elements     []*DataValue // Array, Structure children
+	ErrCode      int          // DataAccessError code
 }
 
 // MarshalData encodes a DataValue into BER wire format.
@@ -93,7 +94,17 @@ func MarshalData(v *DataValue) ([]byte, error) {
 		return berutil.EncodeTLV(TagDataUTCTime, encodeUTCTime(v.Time, v.TimeQuality)), nil
 
 	case TagDataBinaryTime:
-		return berutil.EncodeTLV(TagDataBinaryTime, encodeBinaryTime(v.BinTimeMs)), nil
+		if v.BinTimeShort && (v.BinTimeMs < 0 || v.BinTimeMs >= 24*60*60*1000) {
+			return nil, fmt.Errorf("pdu: binary time-of-day out of range")
+		}
+		if !v.BinTimeShort {
+			instant := time.UnixMilli(v.BinTimeMs).UTC()
+			days := int64(time.Date(instant.Year(), instant.Month(), instant.Day(), 0, 0, 0, 0, time.UTC).Sub(epoch1984) / (24 * time.Hour))
+			if days < 0 || days > math.MaxUint16 {
+				return nil, fmt.Errorf("pdu: binary date out of range")
+			}
+		}
+		return berutil.EncodeTLV(TagDataBinaryTime, encodeBinaryTimeForm(v.BinTimeMs, !v.BinTimeShort)), nil
 
 	case TagDataReal:
 		return berutil.EncodeTLV(TagDataReal, encodeASN1Real(v.Float)), nil
@@ -263,7 +274,7 @@ func decodeDataContentWithDepth(tag byte, content []byte, depth int) (*DataValue
 		if err != nil {
 			return nil, fmt.Errorf("pdu: binary time: %w", err)
 		}
-		return &DataValue{Tag: tag, BinTimeMs: ms}, nil
+		return &DataValue{Tag: tag, BinTimeMs: ms, BinTimeShort: len(content) == 4}, nil
 
 	case TagDataObjId:
 		oid, err := berutil.DecodeObjectIdentifier(content)
@@ -497,6 +508,16 @@ func decodeUTCTime(data []byte) (time.Time, uint8, error) {
 var epoch1984 = time.Date(1984, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func encodeBinaryTime(msEpoch int64) []byte {
+	return encodeBinaryTimeForm(msEpoch, true)
+}
+
+func encodeBinaryTimeForm(ms int64, full bool) []byte {
+	if !full {
+		buf := make([]byte, 4)
+		binary.BigEndian.PutUint32(buf, uint32(ms))
+		return buf
+	}
+	msEpoch := ms
 	t := time.UnixMilli(msEpoch).UTC()
 	days := uint16(t.Sub(epoch1984).Hours() / 24)
 	midnight := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)

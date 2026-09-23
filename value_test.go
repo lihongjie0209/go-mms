@@ -570,6 +570,23 @@ func TestValueEqualBinaryTime(t *testing.T) {
 	}
 }
 
+func TestBinaryTimePreservesWireForm(t *testing.T) {
+	full := NewBinaryTime(time.Date(2024, 6, 15, 12, 30, 0, 0, time.UTC).UnixMilli())
+	if !full.BinaryTimeHasDate() {
+		t.Fatal("NewBinaryTime must use the six-byte date form")
+	}
+	timeOnly := NewBinaryTimeOfDay(86_400)
+	if timeOnly.BinaryTimeHasDate() {
+		t.Fatal("NewBinaryTimeOfDay must use the four-byte time-only form")
+	}
+	if !timeOnly.Clone().Equal(timeOnly) {
+		t.Fatal("clone lost binary-time wire form")
+	}
+	if NewBinaryTime(86_400).Equal(timeOnly) {
+		t.Fatal("binary-time equality ignored wire form")
+	}
+}
+
 func TestValueEqualGeneralizedTime(t *testing.T) {
 	t1 := time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)
 	t2 := time.Date(2025, 6, 2, 12, 0, 0, 0, time.UTC)

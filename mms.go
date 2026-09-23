@@ -2135,7 +2135,7 @@ func valueToDataValue(v *Value) (*pdu.DataValue, error) {
 	case ValueTypeUTCTime:
 		return &pdu.DataValue{Tag: pdu.TagDataUTCTime, Time: v.timeVal, TimeQuality: v.timeQuality}, nil
 	case ValueTypeBinaryTime:
-		return &pdu.DataValue{Tag: pdu.TagDataBinaryTime, BinTimeMs: v.binaryTime}, nil
+		return &pdu.DataValue{Tag: pdu.TagDataBinaryTime, BinTimeMs: v.binaryTime, BinTimeShort: !v.binaryFull}, nil
 	case ValueTypeArray:
 		elems, err := valuesToDataValues(v.elementsVal)
 		if err != nil {
@@ -2200,7 +2200,7 @@ func dataValueToValue(dv *pdu.DataValue) (*Value, error) {
 	case pdu.TagDataUTCTime:
 		return &Value{typ: ValueTypeUTCTime, timeVal: dv.Time, timeQuality: dv.TimeQuality}, nil
 	case pdu.TagDataBinaryTime:
-		return &Value{typ: ValueTypeBinaryTime, binaryTime: dv.BinTimeMs}, nil
+		return &Value{typ: ValueTypeBinaryTime, binaryTime: dv.BinTimeMs, binaryFull: !dv.BinTimeShort}, nil
 	case pdu.TagDataArray:
 		children, err := dataValuesToValues(dv.Elements)
 		if err != nil {

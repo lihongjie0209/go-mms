@@ -304,6 +304,20 @@ func TestDataBinaryTime4ByteDecode(t *testing.T) {
 	if got.BinTimeMs != 86400 {
 		t.Errorf("binary time 4-byte ms = %d, want 86400", got.BinTimeMs)
 	}
+	if !got.BinTimeShort {
+		t.Fatal("4-byte binary time decoded as date form")
+	}
+}
+
+func TestDataBinaryTime4ByteRoundTrip(t *testing.T) {
+	dv := &DataValue{Tag: TagDataBinaryTime, BinTimeMs: 86_400, BinTimeShort: true}
+	b, err := MarshalData(dv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b) != 6 {
+		t.Fatalf("binary time encoded length = %d, want 6", len(b))
+	}
 }
 
 func TestDataStructureRoundTrip(t *testing.T) {

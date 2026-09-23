@@ -68,6 +68,7 @@ type Value struct {
 	timeVal     time.Time
 	timeQuality uint8 // UTCTime quality byte (IEC 61850-8-1 TimeQuality)
 	binaryTime  int64
+	binaryFull  bool     // BinaryTime: true for the six-byte date+time wire form
 	elementsVal []*Value // Structure, Array
 	accessErr   DataAccessErrorCode
 	oidVal      []int // ObjectIdentifier arcs
@@ -225,6 +226,13 @@ func (v *Value) BinaryTime() (val int64, ok bool) {
 	return v.binaryTime, true
 }
 
+// BinaryTimeHasDate reports whether a BinaryTime value uses the six-byte
+// date+time form. It returns false for the four-byte time-of-day form and for
+// values of another type.
+func (v *Value) BinaryTimeHasDate() bool {
+	return v.typ == ValueTypeBinaryTime && v.binaryFull
+}
+
 // GeneralizedTime returns the generalized timestamp. ok is false if
 // the value is not [ValueTypeGeneralizedTime].
 func (v *Value) GeneralizedTime() (val time.Time, ok bool) {
@@ -372,6 +380,12 @@ func NewUTCTimeWithQuality(t time.Time, quality uint8) *Value {
 // NewBinaryTime creates a [Value] of type [ValueTypeBinaryTime].
 // The value is milliseconds since epoch.
 func NewBinaryTime(ms int64) *Value {
+	return &Value{typ: ValueTypeBinaryTime, binaryTime: ms, binaryFull: true}
+}
+
+// NewBinaryTimeOfDay creates a four-byte BinaryTime containing milliseconds
+// since midnight and no date component.
+func NewBinaryTimeOfDay(ms int64) *Value {
 	return &Value{typ: ValueTypeBinaryTime, binaryTime: ms}
 }
 
@@ -450,6 +464,7 @@ func (v *Value) Clone() *Value {
 		timeVal:     v.timeVal,
 		timeQuality: v.timeQuality,
 		binaryTime:  v.binaryTime,
+		binaryFull:  v.binaryFull,
 		accessErr:   v.accessErr,
 		bytesVal:    copyBytes(v.bytesVal),
 	}
@@ -496,7 +511,7 @@ func (v *Value) Equal(other *Value) bool {
 	case ValueTypeUTCTime:
 		return v.timeVal.Equal(other.timeVal) && v.timeQuality == other.timeQuality
 	case ValueTypeBinaryTime:
-		return v.binaryTime == other.binaryTime
+		return v.binaryTime == other.binaryTime && v.binaryFull == other.binaryFull
 	case ValueTypeGeneralizedTime:
 		return v.timeVal.Equal(other.timeVal)
 	case ValueTypeBCD:
@@ -558,7 +573,11 @@ func (v *Value) String() string {
 	case ValueTypeUTCTime:
 		return fmt.Sprintf("%s(q=0x%02x)", v.timeVal.Format(time.RFC3339), v.timeQuality)
 	case ValueTypeBinaryTime:
-		return fmt.Sprintf("BinaryTime(%d ms)", v.binaryTime)
+		form := "time-only"
+		if v.binaryFull {
+			form = "date-time"
+		}
+		return fmt.Sprintf("BinaryTime(%d ms,%s)", v.binaryTime, form)
 	case ValueTypeStructure:
 		var parts []string
 		for _, e := range v.elementsVal {

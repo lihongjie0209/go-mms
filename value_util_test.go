@@ -156,7 +156,7 @@ func TestValueString(t *testing.T) {
 		{"octet", NewOctetString([]byte{1, 2, 3}), "OctetString(3 bytes)"},
 		{"visible", NewVisibleString("hello"), `"hello"`},
 		{"mms", NewMmsString("world"), `MmsString("world")`},
-		{"binary_time", NewBinaryTime(12345), "BinaryTime(12345 ms)"},
+		{"binary_time", NewBinaryTime(12345), "BinaryTime(12345 ms,date-time)"},
 		{"struct", NewStructure([]*Value{NewInteger(1), NewBoolean(true)}), "{1, true}"},
 		{"array", NewArray([]*Value{NewInteger(10), NewInteger(20)}), "[10, 20]"},
 	}
