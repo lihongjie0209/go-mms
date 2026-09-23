@@ -317,6 +317,13 @@ func (c *Client) Negotiated() NegotiatedParameters {
 	}
 }
 
+// Done is closed when the background reader terminates because the peer
+// disconnected, the transport failed, or the client was closed or aborted.
+// The returned channel is owned by Client and must not be closed by callers.
+func (c *Client) Done() <-chan struct{} {
+	return c.readerDone
+}
+
 func (c *Client) conclude(ctx context.Context) error {
 	concludeReq := codec.MarshalConcludeRequest()
 	data := isostack.EncodeDataRequest(concludeReq)

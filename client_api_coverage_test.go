@@ -27,6 +27,22 @@ func unitClient(conn Transport) *Client {
 	}
 }
 
+func TestClientDoneExposesReaderTermination(t *testing.T) {
+	c := unitClient(newMockTransport())
+	done := c.Done()
+	select {
+	case <-done:
+		t.Fatal("Done closed before the reader terminated")
+	default:
+	}
+	close(c.readerDone)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Done did not expose reader termination")
+	}
+}
+
 func TestSendReceiveRaw_AndHooks(t *testing.T) {
 	mt := newMockTransport()
 	c := unitClient(mt)
