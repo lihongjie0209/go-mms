@@ -84,7 +84,7 @@ func newClient(ctx context.Context, conn Transport, opts DialOptions) (*Client, 
 		return nil, err
 	}
 
-	c.tracker = invoke.NewTracker(0)
+	c.tracker = invoke.NewTracker(c.maxOutCalling)
 
 	readerCtx, cancel := context.WithCancel(context.Background())
 	c.readerCancel = cancel

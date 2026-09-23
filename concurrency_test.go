@@ -4,12 +4,48 @@ package mms
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/otfabric/go-mms/internal/pdu"
 )
+
+func TestClientEnforcesNegotiatedOutstandingLimitBeforeSend(t *testing.T) {
+	mt := newMockTransport()
+	srv := newMockServer(t, mt)
+	ctx := context.Background()
+	go srv.handleAssociation(ctx)
+	opts := defaultDialOptions()
+	opts.MMS.MaxOutstandingCalling = 1
+	client, err := NewClient(ctx, mt, opts)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	firstCtx, cancelFirst := context.WithCancel(ctx)
+	firstDone := make(chan error, 1)
+	go func() {
+		_, readErr := client.Read(firstCtx, ReadRequest{DomainID: "D", ItemID: "V1"})
+		firstDone <- readErr
+	}()
+	_, _, _ = srv.handleDataRequest(ctx)
+
+	_, err = client.Read(ctx, ReadRequest{DomainID: "D", ItemID: "V2"})
+	if err == nil || !strings.Contains(err.Error(), "outstanding call limit") {
+		t.Fatalf("second read error=%v", err)
+	}
+	select {
+	case unexpected := <-mt.toServer:
+		t.Fatalf("limit-exceeding request reached transport: %x", unexpected)
+	default:
+	}
+	cancelFirst()
+	if err = <-firstDone; err == nil {
+		t.Fatal("first read succeeded after cancellation")
+	}
+}
 
 // TestConcurrentReads verifies that multiple goroutines can issue Read
 // operations without data races. The mock server handles each request

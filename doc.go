@@ -107,9 +107,9 @@
 //
 // Negotiated MaxOutstandingCalling / MaxOutstandingCalled (see
 // [Client.Negotiated]) are proposed during Initiate and exposed for
-// inspection, but are not enforced as a runtime pending-request limit
-// today. Callers that need back-pressure should limit concurrency
-// themselves. Details: LIMITS.md, KNOWN_LIMITATIONS.md, RACE_NOTES.md.
+// inspection. The negotiated MaxOutstandingCalling value is enforced by the
+// pending-request registry before transport send. Details: LIMITS.md,
+// KNOWN_LIMITATIONS.md, RACE_NOTES.md.
 //
 // A [Server] is safe for concurrent use. Each [Server.Serve] call
 // handles one association; multiple connections are served in parallel

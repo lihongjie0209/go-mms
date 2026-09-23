@@ -78,8 +78,7 @@ type MMSOptions struct {
 	// MaxOutstandingCalling is the maximum number of outstanding
 	// requests this client proposes during Initiate. Zero means use the
 	// library default (5). The negotiated value is exposed via
-	// Client.Negotiated() but is not enforced as a runtime pending-request
-	// limit today.
+	// Client.Negotiated() and is enforced as the runtime pending-request limit.
 	MaxOutstandingCalling int
 
 	// MaxOutstandingCalled is the maximum number of outstanding

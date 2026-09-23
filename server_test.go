@@ -2184,7 +2184,7 @@ func TestConcurrentClientRequests(t *testing.T) {
 	defer func() { _ = client.Close(context.Background()) }()
 
 	var wg sync.WaitGroup
-	const goroutines = 20
+	const goroutines = 5 // default negotiated MaxOutstandingCalling
 
 	for i := 0; i < goroutines; i++ {
 		wg.Add(1)
@@ -2209,7 +2209,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 	defer func() { _ = client.Close(context.Background()) }()
 
 	var wg sync.WaitGroup
-	const goroutines = 10
+	const goroutines = 2 // two operations each stay below the negotiated limit
 
 	for i := 0; i < goroutines; i++ {
 		wg.Add(2)
