@@ -558,7 +558,7 @@ func (ts *TypeSpec) DefaultValue() *Value {
 	case ValueTypeUTCTime:
 		return NewUTCTime(time.Time{})
 	case ValueTypeBinaryTime:
-		return NewBinaryTime(0)
+		return NewBinaryTime(time.Date(1984, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli())
 	case ValueTypeGeneralizedTime:
 		return NewGeneralizedTime(time.Time{})
 	case ValueTypeBCD:
