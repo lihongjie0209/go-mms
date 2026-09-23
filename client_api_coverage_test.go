@@ -172,6 +172,28 @@ func TestDispatchUnconfirmed_AndInfoReport(t *testing.T) {
 	}
 }
 
+func TestInformationReportSubscribersDoNotReplacePrimaryHandler(t *testing.T) {
+	c := unitClient(newMockTransport())
+	var primary, first, second int
+	c.OnInformationReport(func(*InformationReportIndication) { primary++ })
+	removeFirst := c.AddInformationReportHandler(func(*InformationReportIndication) { first++ })
+	c.AddInformationReportHandler(func(*InformationReportIndication) { second++ })
+	report, err := pdu.MarshalInformationReport(&pdu.InformationReportWire{Values: []*pdu.DataValue{{Tag: pdu.TagDataBoolean, Bool: true}}, Variables: []pdu.ObjectNameWire{{Scope: pdu.ScopeDomain, DomainID: "d", ItemID: "i"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, content, err := pdu.DecodePdu(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.dispatchUnconfirmed(content)
+	removeFirst()
+	c.dispatchUnconfirmed(content)
+	if primary != 2 || first != 1 || second != 2 {
+		t.Fatalf("primary=%d first=%d second=%d", primary, first, second)
+	}
+}
+
 func TestReaderLoop_Edges(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

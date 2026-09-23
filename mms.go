@@ -44,8 +44,10 @@ type Client struct {
 	readerDone   chan struct{} // closed when reader loop exits
 	concludeCh   chan struct{} // receives signal when ConcludeResponse arrives
 
-	reportMu      sync.RWMutex
-	reportHandler InformationReportHandler
+	reportMu          sync.RWMutex
+	reportHandler     InformationReportHandler
+	reportHandlers    map[uint64]InformationReportHandler
+	nextReportHandler uint64
 
 	// Negotiated parameters from MMS Initiate handshake.
 	maxPDUSize    int
@@ -566,6 +568,31 @@ func (c *Client) OnInformationReport(handler InformationReportHandler) {
 	c.reportMu.Unlock()
 }
 
+// AddInformationReportHandler adds an independent handler without replacing
+// the primary handler registered by OnInformationReport. It returns an
+// idempotent function that removes only this handler.
+func (c *Client) AddInformationReportHandler(handler InformationReportHandler) func() {
+	if handler == nil {
+		return func() {}
+	}
+	c.reportMu.Lock()
+	if c.reportHandlers == nil {
+		c.reportHandlers = make(map[uint64]InformationReportHandler)
+	}
+	c.nextReportHandler++
+	id := c.nextReportHandler
+	c.reportHandlers[id] = handler
+	c.reportMu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			c.reportMu.Lock()
+			delete(c.reportHandlers, id)
+			c.reportMu.Unlock()
+		})
+	}
+}
+
 func (c *Client) nextInvokeID() codec.InvokeID {
 	return c.tracker.NextID()
 }
@@ -669,9 +696,16 @@ func (c *Client) dispatchUnconfirmed(content []byte) {
 
 	c.reportMu.RLock()
 	handler := c.reportHandler
+	handlers := make([]InformationReportHandler, 0, len(c.reportHandlers)+1)
+	if handler != nil {
+		handlers = append(handlers, handler)
+	}
+	for _, subscriber := range c.reportHandlers {
+		handlers = append(handlers, subscriber)
+	}
 	c.reportMu.RUnlock()
 
-	if handler != nil {
+	for _, handler := range handlers {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
